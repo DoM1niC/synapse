@@ -1554,31 +1554,21 @@ class SyncHandler:
                 return "MISSING_EVENT"
             return event.membership
 
-        # Check for entries in the calculated state which differ from the actual state.
-        for (
-            event_type,
-            state_key,
-        ), calculated_event_id in client_calculated_state.items():
-            if event_type != EventTypes.Member:
-                continue
-
-            actual_event_id = actual_state.get((event_type, state_key))
-            if calculated_event_id != actual_event_id:
-                error_map[state_key] = ClientCalculatedMembershipStateErrorEntry(
-                    actual=await event_id_to_membership(actual_event_id),
-                    calculated=await event_id_to_membership(calculated_event_id),
-                )
-
-        # Check for entries which are missing altogether.
+        # Check for joined members in the actual state that are missing or have a
+        # different membership in the actual state.
         for (event_type, state_key), actual_event_id in actual_state.items():
             if event_type != EventTypes.Member:
                 continue
 
-            if (event_type, state_key) not in client_calculated_state:
-                error_map[state_key] = ClientCalculatedMembershipStateErrorEntry(
-                    actual=await event_id_to_membership(actual_event_id),
-                    calculated=None,
-                )
+            calculated_event_id = client_calculated_state.get((event_type, state_key))
+            if calculated_event_id != actual_event_id:
+                actual_membership = event_id_to_membership(actual_event_id)
+                calculated_membership = event_id_to_membership(calculated_event_id)
+                if actual_membership == Membership.JOIN and calculated_membership != Membership.JOIN:
+                    error_map[state_key] = ClientCalculatedMembershipStateErrorEntry(
+                        actual=actual_membership,
+                        calculated=calculated_membership,
+                    )
 
         return error_map
 
